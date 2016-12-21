@@ -1,0 +1,16 @@
+#!/usr/bin/expect
+# 10.0.0.100 is swich management IP, admin password is "real_password"
+set IP [lindex $argv 0]
+spawn telnet 10.0.0.100
+set timeout 1
+expect "Username:"
+send "admin\n"
+expect "Password:"
+send "real_password\n"
+expect "%"
+send "dis arp $IP\n"
+expect "%"
+set results $expect_out(buffer)
+send "quit\n"
+expect eof
+
