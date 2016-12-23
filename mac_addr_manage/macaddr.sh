@@ -19,7 +19,8 @@ CNUM=`mysql -uroot -p654321 -e "use mac_list; select * from maclist where name='
     MAC_CONT=`mysql -uroot -p654321 -e "use mac_list; select * from maclist where name='$USER_NAME';"|sed -n 2p`
 		for n in {2..11}
           do
-			  array[$n]=`echo ${MAC_CONT}|awk '{print $'$n'}'`
+            array[$n]=`echo ${MAC_CONT}|awk '{print $'$n'}'`
+#     	  [ -z ${array[$n]} ]&& array[$n]="NULL"
 #	  echo "the array is ${array[${n}]}"
 		done
 
@@ -28,7 +29,7 @@ case $DEVICE_TYPE in
    j=0
    for i in {3..4} ;do
 	j=$[j+1] 
-	  echo ${array[$i]}	
+#	  echo ${array[$i]}	
 	   [ -z ${array[$i]} ]||[ ${array[$i]} == "NULL" ]&& `mysql -uroot -p654321 -e "use mac_list; update maclist set computer$j='$MAC_ADDR' where name='$USER_NAME';"`&&exit
    done
 	   error;
@@ -39,7 +40,7 @@ case $DEVICE_TYPE in
    for m in {5..9};do
 	   x=$[x+1]
 #		   echo $x
-		   echo ${array[$m]}
+#		   echo ${array[$m]}
       [ -z ${array[${m}]} ]||[ ${array[${m}]} == "NULL" ] && `mysql -uroot -p654321 -e "use mac_list; update maclist set mobile$x='$MAC_ADDR' where name='$USER_NAME';"`&&exit 
 	done
 	  error;
@@ -106,21 +107,21 @@ else
 		;;
 
 		computer*)
-		`mysql -uroot -p654321 -e "use mac_list; update maclist set $DEVICE_TYPE='' where name='$USER_NAME';"`
+		`mysql -uroot -p654321 -e "use mac_list; update maclist set $DEVICE_TYPE=NULL where name='$USER_NAME';"`
 	    ;;
 
 	    mobile*)
-		`mysql -uroot -p654321 -e "use mac_list; update maclist set $DEVICE_TYPE='' where name='$USER_NAME';"`
+		`mysql -uroot -p654321 -e "use mac_list; update maclist set $DEVICE_TYPE=NULL where name='$USER_NAME';"`
 	    ;;
 
 
 	    kindle_pad)
-		`mysql -uroot -p654321 -e "use mac_list; update maclist set $DEVICE_TYPE='' where name='$USER_NAME';"`
+		`mysql -uroot -p654321 -e "use mac_list; update maclist set $DEVICE_TYPE=NULL where name='$USER_NAME';"`
 	    ;;
 
 
 	    vm_other)
-		`mysql -uroot -p654321 -e "use mac_list; update maclist set $DEVICE_TYPE='' where name='$USER_NAME';"`
+		`mysql -uroot -p654321 -e "use mac_list; update maclist set $DEVICE_TYPE=NULL where name='$USER_NAME';"`
 	    ;;
 
 		*)
