@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# nginx 服务器对 mv, nginx,tar,mkdir 等命令设置sudo免密码，在部署机上添加主机信任。
-# 此脚本存放目录：/scripts/deploy/backup.sh ,权限root 755
+# nginx 服务器对 mv, nginx, tar 等sudo命令设置免密码，在部署机上添加主机信任。
+# 此脚本存放目录：/scripts/deploy/backup.sh ,权限 755
 # 代码备份目录： /code_bak
 # 日志文件：/tmp/code_deploy.log
 # 返回码状态文件： /tmp/backup_status.log
@@ -34,7 +34,7 @@ code_bak() {
 
 [ ! -d "$back_dir" ]&& sudo mkdir -p "$back_dir"
 cd  /usr/local/nginx/
-sudo tar zcf $back_dir/ost_home.tar.gz ost_home
+sudo /usr/bin/tar  zcf $back_dir/ost_home.tar.gz ost_home
 if [ $? -eq 0 ] 
 then
     echo "1" >> /tmp/backup_status.log
