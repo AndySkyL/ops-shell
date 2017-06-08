@@ -9,7 +9,7 @@
 
 ## need two parameter
 deployVersion=$1
-jsVersion=$2
+#jsVersion=$2
 
 ## nginx host list
 host1=host1_ip
@@ -20,15 +20,15 @@ cd /home/deploy/ost
 
 ##deploy tomcat wars
 mvn -f pom_deploy.xml -DdeployVersion=${deployVersion} antrun:run
-
+[ -f webroot ] && rm -f webroot
 ## unzip web files
 unzip -d ./${deployVersion}/ost.web ./${deployVersion}/ost.web.war
 ln -s ./${deployVersion}/ost.web/ webroot
 
 ## replace css & js file path
-sh /scripts/deploy/jscssreplace.sh  /home/deploy/ost/webroot ${jsVersion}
-echo "exe jscssreplace.sh "
-sleep 5
+#sh /scripts/deploy/jscssreplace.sh  /home/deploy/ost/webroot ${jsVersion}
+#echo "exe jscssreplace.sh "
+#sleep 5
 }
 
 remote_bak() {
