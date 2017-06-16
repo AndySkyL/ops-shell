@@ -9,7 +9,7 @@ echo $check_stu
 
 if [ $check_stu -eq 0 ];then
   
-mail -s "RAID DISK ERROR" tangxs@fengkonglm.com 962824378@qq.com  < /scripts/raid_check/raid_check.log
+mail -s "RAID DISK ERROR" andy@qq.com  < /scripts/raid_check/raid_check.log
 
 else
   rm -f /scripts/raid_check/raid_check.log
