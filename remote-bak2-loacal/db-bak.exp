@@ -1,0 +1,20 @@
+#!/usr/bin/expect
+spawn scp -r  -P 6553 username@11.222.18.21:/data/databases /BAK-DATA/
+expect {
+ "(yes/no)?"
+        { 
+         send "yes\n"
+         expect "password:"
+         send "PASSWORD\n"
+        }
+ "password:"
+        {
+         send "PASSWORD\n"
+        }
+       }
+expect "100%"
+set results $expect_out(buffer)
+send "quit\n"
+expect eof
+
+
