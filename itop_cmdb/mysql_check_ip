@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# 此脚本用于查询itop数据库中所有服务器和虚拟机IP使用情况。
+
+
+mysql -uitop -pitop -e "select name,managementip from itop.view_Server;"|grep 192.168.20|awk '{ print $2}' > ip
+mysql -uitop -pitop -e "select name,virtualhost_name,managementip from itop.view_VirtualMachine;"|grep 192.168.20|awk '{print $3}' >> ip
+
+# 排除以下IP地址
+
+echo 192.168.20.242 >> ip  #  xxx 测试平台 openfire VIP
+echo 192.168.20.225 >> ip  #  xxx测试平台 nginx VIP
+echo 192.168.20.2 >> ip  #  xxx测试平台 redis VIP
+
+echo "可用IP如下："
+
+for n in $(seq 1 30) $(seq 202 251)
+  do 
+    for ip in `cat ip|awk -F '.' '{print $4}'` 
+      do
+         if [ $n == $ip ]
+            then
+               continue 2
+         fi
+      done
+    echo "192.168.20.$n"
+done
+
