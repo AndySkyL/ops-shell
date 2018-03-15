@@ -1,0 +1,70 @@
+#!/bin/bash
+
+# nginx 服务器对 mv, nginx, tar 等sudo命令设置免密码，在部署机上添加主机信任。
+# 此脚本存放目录：/scripts/deploy/backup.sh ,权限root 755
+# 代码备份目录： /code_bak
+# 日志文件：/tmp/code_deploy.log
+# 返回码状态文件： /tmp/backup_status.log
+# 代码临时存放目录： /tmp/
+# webroot: /usr/local/nginx/
+
+ACTION=$1
+back_dir=/code_bak
+
+env_init() {
+[ -f /tmp/paraline.web.war ] && rm -fr /tmp/paraline.web.war
+backup_status=`ls -l $back_dir|grep paraline|wc -l`
+if [[ $backup_status == 0 ]]
+  then
+    cp /usr/local/tomcat7/webapps/paraline.web.war /code_bak/paraline_last_web.war  
+fi  
+}
+code_bak() {
+
+[ ! -d "$back_dir" ]&& mkdir -p "$back_dir"
+cd  /tmp/
+cp /tmp/paraline.web.war $back_dir/paraline_web_$(date +%F_%H-%M-%S).war
+if [ $? -eq 0 ] 
+then
+    echo "1" >> /tmp/backup_status.log
+    echo "$(date +%F' '%T) code backup finished" >>/tmp/code_deploy.log
+    exit 0
+else
+    echo "$(date +%F' '%T) code backup failed! " >>/tmp/code_deploy.log
+    exit 2
+fi
+}
+
+code_clean() {
+for n in `find $back_dir -type f -name "paraline*"|xargs ls -larc|awk '{print $9}'|sed -n "6,+20p"`; do rm -f $n;done
+
+}
+
+code_deploy(){
+rm -fr /usr/local/tomcat7/webapps/paraline.web.war && \
+mv /tmp/paraline.web.war /usr/local/tomcat7/webapps/
+
+}
+
+main() {
+> /tmp/backup_status.log
+case $ACTION in
+        init)
+            env_init
+        ;;
+        backup)
+            code_bak
+        ;;
+        deploy)
+            code_deploy
+        ;;
+        clean)
+            code_clean
+        ;;
+
+        *)
+        echo "USAGE: $0 init|backup|deploy|clean" 
+esac
+}
+main
+
