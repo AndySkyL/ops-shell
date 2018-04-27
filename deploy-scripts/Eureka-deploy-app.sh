@@ -40,12 +40,11 @@ for n in `find $back_dir -type f -name "wtp*"|xargs ls -larc|awk '{print $9}'|se
 }
 
 code_deploy(){
-/usr/bin/cp  -fr  /tmp/wtp/* /usr/local/wtp/ && \
-rm -fr /tmp/wtp 
+/usr/bin/cp  -fr  /tmp/wtp/ /usr/local/wtp/ && rm -fr /tmp/wtp 
 if [ $? -eq 0 ];then
   [ ${#array[*]} -gt 1 ] && deploy_args
 else 
-  echo "args error input!" >> /tmp/wtp-server.log
+  echo "$(date '+%F %T') args error input!" >> /tmp/wtp-server.log
   exit 1  
 fi
 }
@@ -53,14 +52,17 @@ fi
 deploy_args(){
 cd /usr/local/wtp
 for ((i=1; i < ${#array[*]}; i++));do
+    
+    echo "$(date '+%F %T') restart app ${array[$i]}"
     if [[ ${array[$i]} == 'wtp-service-security' ]];then
-        /usr/sbin/stopbootapp  -a wtp-service-security && nohup java -jar `ls |grep wtp-service-security*.jar` --spring.profiles.active=prod --auth-server=http://119.253.63.16/security >/dev/null 2>&1&
+        /usr/sbin/stopbootapp  -a wtp-service-security && nohup java -jar `ls |grep wtp-service-security*.jar` --spring.profiles.active=prod --auth-server=http://1.1.1.1/security >/dev/null 2>&1&
     elif [[ ${array[$i]} == 'wtp-eureka-server' ]];then
         /usr/sbin/stopbootapp  -a wtp-eureka-server &&  /usr/sbin/startbootapp -a wtp-eureka-server -p prod2 >> /tmp/wtp-server.log
     else 
         /usr/sbin/stopbootapp  -a ${array[$i]} && /usr/sbin/startbootapp -p prod -a ${array[$i]} >> /tmp/wtp-server.log
 
     fi
+    sleep 1
 done
 
 }
@@ -82,7 +84,7 @@ case $ACTION in
             deploy_args
         ;;
         *)
-        echo "USAGE: $0 [init|backup|deploy|clean|startapp]" 
+        echo "USAGE: $0 init|backup|deploy|clean" 
 esac
 }
 main
