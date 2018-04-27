@@ -1,0 +1,39 @@
+#!/bin/bash
+jarfile='jarfile'
+version='0.0.1-SNAPSHOT'
+
+while getopts a:v: opt
+do
+  case "$opt" in
+    a)
+        jarfile=$OPTARG
+    #    echo "-a value $jarfile"
+        
+        ;;
+    v)  
+        version=$OPTARG
+    #    echo "-v value $OPTARG"
+        ;;
+    \?)
+        echo "Usgae: stopbootapp -a {jarfile}  -v {version default 0.0.1-SNAPSHOT}"
+        ;;
+  esac
+done
+
+if [ $# -lt 1 ]
+  then
+    echo "请指定-a , -v参数！ "
+    exit 1
+else
+  cd .
+  echo "Stopping SpringBoot Application for XNK"
+  #ls
+  #echo "$jarfile-${version}.jar"
+  pid=`ps -ef | grep "$jarfile-${version}.jar" | grep -v grep | awk '{print $2}'`
+  if [ -n "$pid" ]
+  then
+  #!kill -9 强制终止
+    echo "kill -9 的pid:" $pid
+    kill -9 $pid
+  fi
+fi
