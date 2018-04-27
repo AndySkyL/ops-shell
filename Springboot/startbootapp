@@ -1,0 +1,57 @@
+#!/bin/bash
+jarfile='jarfile'
+profile='init-profile'
+version='0.0.1-SNAPSHOT'
+EnvirmentFile=/path/to/config/file
+APP_OPTIONS=''
+[ -f $EnvirmentFile ] && source $EnvirmentFile
+
+
+
+
+while getopts a:p:v: opt
+do
+  case "$opt" in
+    a)
+        jarfile=$OPTARG
+    #    echo "-a value $jarfile"
+        
+        ;;
+    p) 
+        profile=$OPTARG
+    #    echo "-p value $OPTARG"
+        ;;
+    v)  
+        version=$OPTARG
+    #    echo "-v value $OPTARG"
+        ;;
+    \?)
+        echo "Usgae: startbootapp -a {jarfile}  -p {profile} [-v {version default 0.0.1-SNAPSHOT}]"
+        ;;
+  esac
+done
+
+
+
+if [[ $profile == "init-profile" && $jarfile == "jarfile" ]]
+  then
+    echo "must use -a {jarfile}  -p {profile} option!"
+    exit 1
+#    chmod 775 ./xnk-service-main-0.0.1-SNAPSHOT.jar
+else
+    echo "授予当前用户权限"
+    chmod 775 ./$jarfile-${version}.jar
+#    echo "chmod 775 ./$jarfile-${version}.jar"
+    echo "执行....."
+    nohup java -jar $jarfile-${version}.jar  $APP_OPTIONS --spring.profiles.active=$profile > ${jarfile}.log 2>&1 & 
+#    echo "nohup java -jar $jarfile-${version}.jar > xnk-service-main.log 2>&1 & "
+    echo "********************** xnk-service-main started *************************"
+fi
+
+
+
+
+
+
+
+
