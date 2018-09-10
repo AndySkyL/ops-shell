@@ -20,7 +20,11 @@ done
 }
 
 FileArchive(){
-tar zcvPf ${ArchiveFile} ${ArchiveDir} 
+
+#tar zcvPf ${ArchiveFile} ${ArchiveDir} 
+cd $ArchiveDir && cd ..
+tarDir=`echo $ArchiveDir|awk -F '/' '{print $NF}'`
+tar zcvf ${ArchiveFile} ${tarDir} 
 rm -fr $ArchiveDir
 
 }
