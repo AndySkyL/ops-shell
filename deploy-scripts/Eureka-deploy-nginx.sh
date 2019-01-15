@@ -1,92 +1,272 @@
 #!/bin/bash
 
+# this is wtp deploy scripts
+# deploy host add ssh trust to all web hosts
+## global parameters
+username='test'
+nginx1=192.168.0.1
+nginx2=192.168.0.2
+web1=192.168.0.3
+web2=192.168.0.4
+web3=192.168.0.5
+web4=192.168.0.6
 
-ACTION=$1
-back_dir=/code_bak
+web1_jars=(wtp-eureka-server wtp-zuul wtp-service-synth wtp-service-system wtp-service-listed wtp-service-schedule wtp-service-security)
+web2_jars=(wtp-eureka-server wtp-zuul wtp-service-memb wtp-service-files wtp-service-conf wtp-service-pay wtp-service-portal)
+web3_jars=(wtp-service-synth wtp-service-system wtp-service-listed wtp-service-schedule wtp-service-security)
+web4_jars=(wtp-service-memb wtp-service-files wtp-service-conf wtp-service-pay wtp-service-portal)
 
-env_init() {
-[ -d /tmp/wtp-old ] && rm -fr /tmp/wtp-old 
-[ -d /tmp/wtp ]&& mv /tmp/wtp /tmp/wtp-old && mkdir /tmp/wtp
-[ ! -d /tmp/wtp ]&& mkdir /tmp/wtp
-backup_status=`ls -l $back_dir|grep dzjy|wc -l`
-if [[ $backup_status == 0 ]]
-  then
-    cd /usr/local/
-    /usr/bin/tar  zcf /code_bak/wtp_last_$(date +%F_%H-%M-%S).tar.gz ./wtp 
-fi  
+
+
+## user-defined paramaters
+COM_TYPE=$1
+COM_NUM=$#
+STATIC_DIR_NUM=0
+JAR_NUM=0
+array=($*)
+static_hosts=($nginx1 $nginx2)
+web_hosts=($web1 $web2 $web3 $web4)
+
+deploy_init(){
+mv /tmp/project.tar.gz /home/deploy/project/
+cd /home/deploy/project/
+tar xf project.tar.gz
+cd V* && ls jars/ > ../jar.list
+ls|grep -v jars > ../static.list
+
+echo "代码包初始化完成..."
+sleep 1
+
 }
 
-back_up(){
-
-[ ! -d "$back_dir" ]&& mkdir -p "$back_dir"
-cd  /usr/local/
-/usr/bin/tar  zcf $back_dir/wtp_$(date +%F_%H-%M-%S).tar.gz ./wtp
-if [ $? -eq 0 ] 
-then
-    echo "1" > /tmp/backup_status.log
-    echo "$(date +%F' '%T) code backup finished" >>/tmp/code_deploy.log
-    exit 0
+input_judege(){
+if [[ $COM_NUM == 0 ]];then
+  echo "deploy with no parameters"
+  remote_backup
+  file_detribuation
+  remote_deploy
+elif [[ $COM_TYPE == 'static' ]];then
+  if [[ $COM_NUM == 1 ]];then
+    remote_backup static
+    file_detribuation static
+    remote_deploy static
+  elif [ $COM_NUM -gt 1 ];then
+    file_judge 
+    remote_backup static
+    file_detribuation static 
+    for host in ${static_hosts[*]};do
+      for ((i=1; i < ${#array[*]}; i++));do
+        ssh -t $username@$host /bin/sh /scripts/deploy.sh ${array[i]}
+      done
+    done
+  else
+      help_doc
+  fi
+elif [[ $COM_TYPE == 'web' ]];then
+    remote_backup web
+    file_detribuation web
+    remote_deploy web
 else
-    echo "$(date +%F' '%T) code backup failed! " >>/tmp/code_deploy.log
-    exit 2
+    help_doc
+  fi
+}
+
+help_doc(){
+echo "USAGE: $0 {static}  [adminroot|shouguang|webroot]  only deploy static file.
+             $0 {web}  only deploy backend file.
+             $0  No parameters deploy all.
+"
+}
+
+file_judge(){
+cd /home/deploy/project/V*
+
+  for ((i=1; i < ${#array[*]}; i++));do
+    
+      test -d ${array[i]}
+      if [[ $? == 0 ]];then
+        echo "${array[i]} checked ..."
+      else
+        echo "${array[i]} is not exits! please check parameters"
+        exit 3
+      fi
+  done
+}
+
+
+remote_backup(){
+if [[ $1 == 'static' ]];then
+   for host in ${static_hosts[*]};do
+     echo "backup data to host $host ..."
+     ssh -t $username@$host /bin/sh /scripts/deploy.sh backup
+     backup_status $host
+   done 
+elif [[ $1 == 'web' ]];then
+   for host in ${web_hosts[*]};do
+     echo "backup data to host $host ..."
+     ssh -t $username@$host /bin/sh /scripts/deploy.sh backup
+     backup_status $host
+   done 
+else  
+   for host in ${static_hosts[*]} ${web_hosts[*]};do
+     echo "backup data to host $host ..."
+     ssh -t $username@$host /bin/sh /scripts/deploy.sh backup
+     backup_status $host
+   done
 fi
 }
 
-code_clean() {
-for n in `find $back_dir -type f -name "wtp*"|xargs ls -larc|awk '{print $9}'|sed -n "6,+20p"`; do rm -f $n;done
+# waiting node backup data 
+backup_status(){
+host=$1
+echo "waiting host $host backup data..."
+for m in {1..60};do
+  status_code=$(ssh $username@$host cat /tmp/backup_status.log)
+ #  echo $status_code
+  if [[ $status_code == "1" ]];then
+     echo "$host backup data successful!"
+     break 
+  elif [[ $status_code == "2" ]];then
+     echo "$host backup data failed!"
+     exit 2
+  else
+     sleep 3
+  fi
+  
+  if [ $m -gt 56 ];then
+    echo "backup timeout, please check the target server."
+    exit 3
+  fi
+done
+}
+
+
+file_detribuation(){
+if [[ $1 == 'static' ]];then
+   for host in ${static_hosts[*]};do
+     for static_dir in `ls |grep -v jars`;do 
+       scp -r -p $static_dir $username@$host:/tmp/wtp
+       echo "destributing static file $static_dir to host $host"
+     done
+   done
+elif [[ $1 == 'web' ]];then
+   for host in ${web_hosts[*]};do
+     if [[ $host == $web1 ]];then
+        for jars in ${web1_jars[*]};do
+          scp jars/`grep $jars ../jar.list` $username@$host:/tmp/wtp/
+          echo "distributing jars $jars to host $host ..."
+        done
+     fi
+     if [[ $host == $web2 ]];then
+        for jars in ${web2_jars[*]};do
+          scp jars/`grep $jars ../jar.list` $username@$host:/tmp/wtp/
+          echo "distributing jars $jars to host $host ..."
+        done
+     fi
+     if [[ $host == $web3 ]];then
+        for jars in ${web3_jars[*]};do
+          scp jars/`grep $jars ../jar.list` $username@$host:/tmp/wtp/
+          echo "distributing jars $jars to host $host ..."
+        done
+     fi
+     if [[ $host == $web4 ]];then
+        for jars in ${web4_jars[*]};do
+          echo "**************distributing jars $jars to host $host ...************************"
+          scp jars/`grep $jars ../jar.list` $username@$host:/tmp/wtp/
+        done
+     fi
+
+   done
+else   
+  for host in ${static_hosts[*]};do
+     echo "*******************distributing static data to host $host ...***********************"
+     for static_dir in `ls |grep -v jars`;do
+       scp -r -p $static_dir  $username@$host:/tmp/wtp/
+     done
+  done
+   for host in ${web_hosts[*]};do
+     if [[ $host == $web1 ]];then
+        for jars in ${web1_jars[*]};do
+          echo "distributing jars $jars to host $host ..."
+          scp jars/`grep $jars ../jar.list` $username@$host:/tmp/wtp
+        done
+     fi
+     if [[ $host == $web2 ]];then
+        for jars in ${web2_jars[*]};do
+          echo "distributing jars $jars to host $host ..."
+          scp jars/`grep $jars ../jar.list` $username@$host:/tmp/wtp
+        done
+     fi
+     if [[ $host == $web3 ]];then
+        for jars in ${web3_jars[*]};do
+          echo "distributing jars $jars to host $host ..."
+          scp jars/`grep $jars ../jar.list` $username@$host:/tmp/wtp
+        done
+     fi
+     if [[ $host == $web4 ]];then
+        for jars in ${web4_jars[*]};do
+          echo "distributing jars $jars to host $host ..."
+          scp jars/`grep $jars ../jar.list` $username@$host:/tmp/wtp
+        done
+     fi
+   
+   done
+fi
+
 
 }
 
-code_deploy(){
-[ -d /tmp/wtp ] && \
-rm -fr /usr/local/wtp/* && \
-mv /tmp/wtp/* /usr/local/wtp/
+
+remote_deploy(){
+if [[ $1 == 'static' ]];then
+   for host in ${static_hosts[*]};do
+     ssh -t $username@$host /bin/sh /scripts/deploy.sh  deploy
+     echo "deploy to host $host ..."
+   done
+elif [[ $1 == 'web' ]];then
+  web_deploy
+else
+   for host in ${static_hosts[*]};do
+     ssh -t $username@$host /bin/sh /scripts/deploy.sh deploy
+     echo "deploy to host $host ..."
+   done
+   for host in ${web_hosts[*]};do
+     echo "deploy to host $host ..."
+     web_deploy
+   done
+fi
+}
+
+web_deploy(){
+  for host in ${web_hosts[*]};do
+     if [[ $host == $web1 ]];then
+       ssh -t $username@$host /bin/sh /scripts/deploy.sh deploy  ${web1_jars[*]}
+     fi
+     if [[ $host == $web2 ]];then
+       ssh -t $username@$host /bin/sh /scripts/deploy.sh deploy  ${web2_jars[*]}
+     fi
+     if [[ $host == $web3 ]];then
+       ssh -t $username@$host /bin/sh /scripts/deploy.sh deploy  ${web3_jars[*]}
+     fi
+     if [[ $host == $web4 ]];then
+       ssh -t $username@$host /bin/sh /scripts/deploy.sh deploy  ${web4_jars[*]}
+     fi
+  done
 
 }
 
-deploy_shouguang(){
-[ -d /tmp/wtp/shouguang ] && \
-rm -fr /usr/local/wtp/shouguang  && \
-mv /tmp/wtp/shouguang  /usr/local/wtp/
+
+deploy_fin(){
+cd /home/deploy/project
+mv  project.tar.gz project-$(date +%F_%H-%M-%S).tar.gz
+rm -fr V*
+
 }
 
-deploy_webroot(){
-[ -d /tmp/wtp/webroot ] && \
-rm -fr /usr/local/wtp/webroot  && \
-mv /tmp/wtp/webroot  /usr/local/wtp/
-}
-
-deploy_adminroot(){
-[ -d /tmp/wtp/adminroot ] && \
-rm -fr /usr/local/wtp/adminroot  && \
-mv /tmp/wtp/adminroot  /usr/local/wtp/
-}
-
-main() {
-case $ACTION in
-        backup)
-            env_init
-            back_up
-        ;;
-        deploy)
-            code_deploy
-        ;;
-        clean)
-            code_clean
-        ;;
-        shouguang)
-            deploy_shouguang
-        ;;
-        adminroot)
-            deploy_adminroot
-        ;;
-        webroot)
-            deploy_webroot
-        ;;
-        *)
-        echo "USAGE: $0 backup|deploy|clean|shouguang|adminroot|webroot" 
-esac
+main(){
+deploy_init
+input_judege
+deploy_fin
 }
 main
-
 

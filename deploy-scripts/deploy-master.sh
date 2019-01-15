@@ -1,116 +1,273 @@
 #!/bin/bash
 
-#this script for xxx
-### usage:
-### deploy.sh ${deployVersion} 
-
-
-
-## need one parameter
-#deployVersion=$1
+# this is wtp deploy scripts
 
 ## global parameters
-username='xxx'
-nginx1=192.168.10.81
-nginx2=192.168.10.82
-web1=192.168.10.83
-web2=192.168.10.84
-admin=192.168.10.85
-project_name='demo'
+username='app'
+nginx1=192.168.1.1
+nginx2=192.168.1.2
+web1=192.168.1.3
+web2=192.168.1.4
+web3=192.168.1.5
+web4=192.168.1.6
+
+web1_jars=(eureka-server zuul files  security )
+web2_jars=(eureka-server zuul files  security)
+web3_jars=(product system trade statistics)
+web4_jars=(product system trade statistics)
 
 
-deploy_init() {
-# check remote env
-for nodes in $nginx1 $nginx2 $web1 $web2 $admin
-do
-ssh -t $username@$nodes /bin/sh /scripts/deploy/backup.sh init
-done
-echo "web server init finished"
-sleep 2
-mv /tmp/$(project_name).zip /home/deploy/$project_name/
-cd /home/deploy/$(project_name)
-unzip $(project_name).zip
-echo "package is ready, copy to web node..."
- 
-##deploy tomcat wars
-#mvn -f pom_deploy_pingxx.xml -DdeployVersion=${deployVersion} antrun:run 
-scp -r -p  $web1/$(project_name).web.war $username@$web1:/tmp/
-scp -r -p  $web2/$(project_name).web.war $username@$web2:/tmp/
-scp -r -p  $admin/$(project_name).admin.war $username@$admin:/tmp/
 
-## unzip web files
-unzip -d  $admin/ $admin/$(project_name).admin.war
-unzip -d  $web1/ $web1/$(project_name).web.war
+## user-defined paramaters
+COM_TYPE=$1
+COM_NUM=$#
+STATIC_DIR_NUM=0
+JAR_NUM=0
+array=($*)
+static_hosts=($nginx1 $nginx2)
+web_hosts=($web1 $web2 $web3 $web4)
 
-# deploy to nginx-2
-echo "######  deploy static file to nginx-2... ######"
-scp -r -p $admin/static $username@$nginx2:/tmp/admin/
-scp -r -p $admin/index.html $username@$nginx2:/tmp/admin/
-scp -r -p $web1/static $username@$nginx2:/tmp/web/
-scp -r -p $web1/index.html $username@$nginx2:/tmp/web/
-scp -r -p $web1/app $username@$nginx2:/tmp/web/
+deploy_init(){
+mv /tmp/app.tar.gz /home/deploy/app/
+cd /home/deploy/app/
+tar xf app.tar.gz
+cd V*  
+[ -d jars ] && ls jars/ > ../jar.list  
+ls|grep -v jars > ../static.list
 
-# deploy to nginx-1
-echo "######  deploy static file to nginx-1... ######"
-scp -r -p $admin/static $username@$nginx1:/tmp/admin/
-scp -r -p $admin/index.html $username@$nginx1:/tmp/admin/
-scp -r -p $web1/static $username@$nginx1:/tmp/web/
-scp -r -p $web1/index.html $username@$nginx1:/tmp/web/
-scp -r -p $web1/app $username@$nginx1:/tmp/web/
+
+echo "代码包初始化完成..."
+sleep 1
+
 }
 
-remote_bak() {
-for nodesbak in $nginx1 $nginx2 $web1 $web2 $admin
-do
-echo "backup file in $nodesbak..."
-ssh -t $username@$nodesbak /bin/sh /scripts/deploy/backup.sh backup
-done
+input_judege(){
+if [[ $COM_NUM == 0 ]];then
+  echo "deploy with no parameters"
+  remote_backup
+  file_detribuation
+  remote_deploy
+elif [[ $COM_TYPE == 'static' ]];then
+  if [[ $COM_NUM == 1 ]];then
+    remote_backup static
+    file_detribuation static
+    remote_deploy static
+  elif [ $COM_NUM -gt 1 ];then
+    file_judge 
+    remote_backup static
+    file_detribuation static 
+    for host in ${static_hosts[*]};do
+      for ((i=1; i < ${#array[*]}; i++));do
+        ssh -t $username@$host /bin/sh /scripts/deploy.sh ${array[i]}
+      done
+    done
+  else
+      help_doc
+  fi
+elif [[ $COM_TYPE == 'web' ]];then
+    remote_backup web
+    file_detribuation web
+    remote_deploy web
+else
+    help_doc
+  fi
+}
 
-for n in  {1..11}
-do
-   sleep 1
-   code_nginx1=$(ssh $(username)@$nginx1 cat /tmp/backup_status.log)
-   code_nginx2=$(ssh $(username)@$nginx2 cat /tmp/backup_status.log)
-   if [[ $code_nginx1 == "1" && $code_nginx2 == "1" ]]
-   then
-       echo "nginx backup successful!"
-       break
-   else
-       echo "backup in progress..."
-   fi 
+help_doc(){
+echo "USAGE: $0 {static}  [adminroot|shouguang|webroot]  only deploy static file.
+             $0 {web}  only deploy backend file.
+             $0  No parameters deploy all.
+"
+}
+
+file_judge(){
+cd /home/deploy/app/V*
+
+  for ((i=1; i < ${#array[*]}; i++));do
+    
+      test -d ${array[i]}
+      if [[ $? == 0 ]];then
+        echo "${array[i]} checked ..."
+      else
+        echo "${array[i]} is not exits! please check parameters"
+        exit 3
+      fi
+  done
+}
+
+
+remote_backup(){
+if [[ $1 == 'static' ]];then
+   for host in ${static_hosts[*]};do
+     echo "backup data to host $host ..."
+     ssh -t $username@$host /bin/sh /scripts/deploy.sh backup
+     backup_status $host
+   done 
+elif [[ $1 == 'web' ]];then
+   for host in ${web_hosts[*]};do
+     echo "backup data to host $host ..."
+     ssh -t $username@$host /bin/sh /scripts/deploy.sh backup
+     backup_status $host
+   done 
+else  
+   for host in ${static_hosts[*]} ${web_hosts[*]};do
+     echo "backup data to host $host ..."
+     ssh -t $username@$host /bin/sh /scripts/deploy.sh backup
+     backup_status $host
+   done
+fi
+}
+
+backup_status(){
+host=$1
+echo "waiting host $host backup data..."
+for m in {1..110};do
+  status_code=$(ssh $username@$host cat /tmp/backup_status.log)
+ #  echo $status_code
+  if [[ $status_code == "1" ]];then
+     echo "$host backup data successful!"
+     break 
+  elif [[ $status_code == "2" ]];then
+     echo "$host backup data failed!"
+     exit 2
+  else
+     sleep 3
+  fi
+  
+  if [ $m -gt 100 ];then
+    echo "backup timeout, please check the target server."
+    exit 3
+  fi
+done
+}
+
+
+file_detribuation(){
+if [[ $1 == 'static' ]];then
+   for host in ${static_hosts[*]};do
+     for static_dir in `ls |grep -v jars`;do 
+       scp -r -p $static_dir $username@$host:/tmp/app
+       echo "destributing static file $static_dir to host $host"
+     done
+   done
+elif [[ $1 == 'web' ]];then
+   for host in ${web_hosts[*]};do
+     if [[ $host == $web1 ]];then
+        for jars in ${web1_jars[*]};do
+          scp jars/`grep $jars ../jar.list` $username@$host:/usr/local/app/
+          echo "distributing jars $jars to host $host ..."
+        done
+     fi
+     if [[ $host == $web2 ]];then
+        for jars in ${web2_jars[*]};do
+          scp jars/`grep $jars ../jar.list` $username@$host:/usr/local/app/
+          echo "distributing jars $jars to host $host ..."
+        done
+     fi
+     if [[ $host == $web3 ]];then
+        for jars in ${web3_jars[*]};do
+          scp jars/`grep $jars ../jar.list` $username@$host:/usr/local/app/
+          echo "distributing jars $jars to host $host ..."
+        done
+     fi
+     if [[ $host == $web4 ]];then
+        for jars in ${web4_jars[*]};do
+          echo "**************distributing jars $jars to host $host ...************************"
+          scp jars/`grep $jars ../jar.list` $username@$host:/usr/local/app/
+        done
+     fi
+
+   done
+else   
+  for host in ${static_hosts[*]};do
+     echo "*******************distributing static data to host $host ...***********************"
+     for static_dir in `ls |grep -v jars`;do
+       scp -r -p $static_dir  $username@$host:/tmp/app/
+     done
+  done
+   for host in ${web_hosts[*]};do
+     if [[ $host == $web1 ]];then
+        for jars in ${web1_jars[*]};do
+          echo "distributing jars $jars to host $host ..."
+          scp jars/`grep $jars ../jar.list` $username@$host:/usr/local/app/
+        done
+     fi
+     if [[ $host == $web2 ]];then
+        for jars in ${web2_jars[*]};do
+          echo "distributing jars $jars to host $host ..."
+          scp jars/`grep $jars ../jar.list` $username@$host:/usr/local/app/
+        done
+     fi
+     if [[ $host == $web3 ]];then
+        for jars in ${web3_jars[*]};do
+          echo "distributing jars $jars to host $host ..."
+          scp jars/`grep $jars ../jar.list` $username@$host:/usr/local/app/
+        done
+     fi
+     if [[ $host == $web4 ]];then
+        for jars in ${web4_jars[*]};do
+          echo "distributing jars $jars to host $host ..."
+          scp jars/`grep $jars ../jar.list` $username@$host:/usr/local/app/
+        done
+     fi
    
-   if [ $n -eq 10 ]
-   then
-       echo "nginx backup failed!"
-       exit 1	   
-
-   fi	   
-done
+   done
+fi
 }
 
 
-## copy web files over ssh to nginx server
-deploy_files() {
-for node in $nginx1 $nginx2 $web1 $web2 $admin
-do
-sleep 3
-echo "deploying  $node ..."
-ssh -t $username@$node /bin/sh /scripts/deploy/backup.sh deploy
-ssh -t $username@$node /bin/sh /scripts/deploy/backup.sh clean
-done
+remote_deploy(){
+if [[ $1 == 'static' ]];then
+   for host in ${static_hosts[*]};do
+     ssh -t $username@$host /bin/sh /scripts/deploy.sh  deploy
+     echo "deploy to host $host ..."
+   done
+elif [[ $1 == 'web' ]];then
+  web_deploy
+else
+   for host in ${static_hosts[*]};do
+     echo "deploy to host $host ..."
+     ssh -t $username@$host /bin/sh /scripts/deploy.sh deploy
+     sleep 5
+   done
+#   for host in ${web_hosts[*]};do
+#     echo "deploy to host $host ..."
+     web_deploy
+#   done
+fi
 }
 
-local_clean() {
-rm -fr $web1
-rm -fr $web2
-rm -fr $admin
-mv $project_name.zip /tmp/
+web_deploy(){
+  for host in ${web_hosts[*]};do
+     echo "*************************** $host deploy **********************************"
+     if [[ $host == $web1 ]];then
+       ssh -t $username@$host /bin/sh /scripts/deploy.sh deploy  ${web1_jars[*]}
+     fi
+     if [[ $host == $web2 ]];then
+       ssh -t $username@$host /bin/sh /scripts/deploy.sh deploy  ${web2_jars[*]}
+     fi
+     if [[ $host == $web3 ]];then
+       ssh -t $username@$host /bin/sh /scripts/deploy.sh deploy  ${web3_jars[*]}
+     fi
+     if [[ $host == $web4 ]];then
+       ssh -t $username@$host /bin/sh /scripts/deploy.sh deploy  ${web4_jars[*]}
+     fi
+     sleep 3
+  done
 
 }
-main () {
+
+
+deploy_fin(){
+cd /home/deploy/app
+mv  app.tar.gz app-$(date +%F_%H-%M-%S).tar.gz
+rm -fr V*
+
+}
+
+main(){
 deploy_init
-remote_bak
-deploy_files
+input_judege
+deploy_fin
 }
 main
-
