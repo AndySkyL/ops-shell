@@ -1,0 +1,106 @@
+---
+- hosts: all 
+#  remote_user: www
+#  become: True
+  tasks:
+  - name: stop and disable firewalld
+    service:
+      name: firewalld
+      state: stopped
+      enabled: no
+  - name: stop and disable NetworkManager 
+    service:
+      name: NetworkManager
+      state: stopped
+      enabled: no
+  - name: stop and disable postfix
+    service:
+      name: postfix
+      state: stopped
+      enabled: no
+  - name: Disable SELinux package required
+    yum:
+      name: libselinux-python
+      state: present
+  - selinux:
+      state: disabled
+  - name: install epel rpm
+    yum:
+      name: https://mirrors.aliyun.com/epel/epel-release-latest-7.noarch.rpm
+      state: present
+    notify: update_packages
+  - name: exec handler
+    meta:  flush_handlers
+
+  - name: import key
+    command: rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+  - name: upgrate kernel
+    yum:
+      name: http://www.elrepo.org/elrepo-release-7.0-3.el7.elrepo.noarch.rpm
+      state: present
+  - name: install kernel
+    yum:
+      name: kernel-lt
+      enablerepo: elrepo-kernel
+      state: present
+    notify: change_kernel_version
+
+  - name: exec handler2
+    meta:  flush_handlers
+  - name: change kernel args
+    sysctl:
+      name: vm.swappiness
+      value: 0
+      state: present
+  - name: change kernel args1
+    sysctl:
+      name: net.ipv4.ip_local_port_range
+      value: 10000 65535
+  - name: change kernel args2
+    sysctl:
+      name: fs.file-max
+      value: 2000000
+  - name: change kernel args3
+    sysctl:
+      name: net.ipv4.ip_forward
+      value: 1
+  - name: change kernel args4
+    sysctl:
+      name: net.bridge.bridge-nf-call-iptables
+      value: 1
+      reload: no
+  - name: change kernel args5
+    sysctl:
+      name: net.bridge.bridge-nf-call-ip6tables
+      value: 1
+      reload: no
+
+  - name: change history display
+    lineinfile:
+      path: /etc/profile
+      line: 'export HISTTIMEFORMAT="%F %T `whoami`"'
+  - name: login info
+    lineinfile:
+      path: /etc/bashrc
+      line: export PROMPT_COMMAND='{ msg=$(history 1 | { read x y; echo $y; });logger "[euid=$(whoami)]":$(who am i):[`pwd`]"$msg"; }'
+
+
+  handlers:
+  - name: change_kernel_version
+    script: ./kernel.sh    
+  - name: update_packages 
+    yum:
+      name: "{{ packages }}"
+    vars:
+      packages:
+      - '*'
+      - ntpdate
+      - ntp
+      - net-tools
+      - lsof
+      - telnet
+      - wget
+      - lrzsz
+      - unzip
+      - vim
+      state: latest 
