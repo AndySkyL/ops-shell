@@ -3,7 +3,9 @@ jarfile='jarfile'
 profile='init-profile'
 version='0.0.1-SNAPSHOT'
 EnvirmentFile=/path/to/config/file
+
 APP_OPTIONS=''
+JVM_OPTIONS=''
 [ -f $EnvirmentFile ] && source $EnvirmentFile
 
 
@@ -43,9 +45,9 @@ else
     chmod 775 ./$jarfile-${version}.jar
 #    echo "chmod 775 ./$jarfile-${version}.jar"
     echo "执行....."
-    nohup java -jar $jarfile-${version}.jar  $APP_OPTIONS --spring.profiles.active=$profile > ${jarfile}.log 2>&1 & 
+    nohup java $JVM_OPTIONS -jar $jarfile-${version}.jar  $APP_OPTIONS --spring.profiles.active=$profile > ${jarfile}.log 2>&1 & 
 #    echo "nohup java -jar $jarfile-${version}.jar > xnk-service-main.log 2>&1 & "
-    echo "********************** xnk-service-main started *************************"
+    echo "********************** $jarfile-${version} started *************************"
 fi
 
 
