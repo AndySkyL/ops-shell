@@ -80,6 +80,12 @@ echo "USAGE: $0 {static}  only deploy static file.
 
 
 static_file_detribuation(){
+
+static_dir_nums=`ls |grep -v jars|wc -l` 
+
+if [[ $static_dir_nums -gt 0 ]];then
+	echo "this version will deploy $static_dir_nums static_dirs"
+
    for host in ${static_hosts[*]};do
      ssh  $username@$host "[ -d /tmp/$projectname ] && rm -fr /tmp/$projectname"
      ssh  $username@$host "[ ! -d /tmp/$projectname ] && mkdir /tmp/$projectname"
@@ -89,10 +95,15 @@ static_file_detribuation(){
        ssh  $username@$host "rm -fr /usr/local/$projectname/$static_dir && mv /tmp/$projectname/$static_dir  /usr/local/$projectname/ "
         done
    done
+
+else 
+	echo "this deploy version NO STATIC FILES!"
+fi
 }
 
 
 app_deploy(){
+if [[ -d jars/ ]];then
 for jar in `ls jars`;do
    app_name_hosts=`echo $jar |sed 's/-latest.jar//'|sed 's/-/_/g'`
  
@@ -117,6 +128,10 @@ for jar in `ls jars`;do
 
    done
 done
+
+else
+   echo "this deploy version NO JAR FILES!"
+fi
 
 }
 
